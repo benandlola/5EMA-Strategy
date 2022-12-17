@@ -1,21 +1,17 @@
 import alpaca_trade_api as tradeapi
 import pandas as pd
+import config
 
-#API authentication keys from Alpaca dashboard
-#https://app.alpaca.markets/paper/dashboard/overview
-api_key = 'PKISNRCWZAZ2MSXHLXYP'
-api_secret = 'Ljtng6fCX2OlUgaqWLzRroXGAlcsQwn1RSepdZXZ'
-api_url = 'https://paper-api.alpaca.markets'
-
-
-api = tradeapi.REST(api_key, api_secret, api_url, 'v2')
-cryptos = ['BTCUSD', 'ETHUSD']
+api = tradeapi.REST(config.api_key, config.api_secret, config.api_url, 'v2')
+cryptos = ['BTCUSD', 'ETHUSD', 'LTCUSD', 'DOGEUSD', 'AAVEUSD', 'ALGOUSD', 'SOLUSD']
 
 emas = {}
 closes = {}
+positions = {}
 
 for crypto in cryptos:
-    data = api.get_crypto_bars(crypto, '15Min', exchanges='CBSE').df
+    data = api.get_crypto_bars(crypto, '15Min').df
+    #set correct timezone
     data = data.reset_index()
     data['timestamp'] = data['timestamp'].dt.tz_convert('America/New_York')
     data = data.set_index('timestamp')
@@ -33,6 +29,9 @@ for crypto in cryptos:
         five_ema = (val*2)/6 + five_ema*(1-2/6)
   
     emas[crypto] = five_ema
+   # positions[crypto] = 
+    print(api.list_positions())
+
 
 
 for crypto, value in emas.items():
@@ -40,6 +39,8 @@ for crypto, value in emas.items():
         print('buy')
     else:
         print('sell')
+
+
 
 
 
