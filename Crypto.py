@@ -1,8 +1,9 @@
 import alpaca_trade_api as tradeapi
 import pandas as pd
-import config
+from config import api_key, api_secret, api_url
 
-api = tradeapi.REST(config.api_key, config.api_secret, config.api_url, 'v2')
+
+api = tradeapi.REST(api_key, api_secret, api_url, 'v2')
 cryptos = ['BTCUSD', 'ETHUSD', 'LTCUSD', 'DOGEUSD', 'AAVEUSD', 'ALGOUSD', 'SOLUSD']
 
 emas = {}
