@@ -1,9 +1,9 @@
 import alpaca_trade_api as tradeapi
 import pandas as pd
 import time
-from config import api_key, api_secret, api_url
+from config import API_KEY, API_SECRET, API_URL
 
-api = tradeapi.REST(api_key, api_secret, api_url, 'v2')
+api = tradeapi.REST(API_KEY, API_SECRET, API_URL, 'v2')
 cryptos = ['BTCUSD', 'ETHUSD', 'LTCUSD', 'DOGEUSD', 'AAVEUSD', 'ALGOUSD', 'SOLUSD']
 
 while(True):
@@ -13,7 +13,7 @@ while(True):
     positions = {}
 
     for crypto in cryptos:
-        data = api.get_crypto_bars(symbol=crypto, timeframe='5Min').df
+        data = api.get_crypto_bars(symbol=crypto, timeframe='15Min').df
         #set correct timezone
         data = data.reset_index()
         data['timestamp'] = data['timestamp'].dt.tz_convert('America/New_York')
