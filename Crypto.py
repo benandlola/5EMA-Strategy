@@ -21,22 +21,34 @@ class fiveEMA:
         print(self.api.get_account().status)
         self.algorithm()
 
+    #wait for the time to hit a 15 min break point and an extra minute for the new data to come in
+    def wait(self):
+        while(True):
+            current_time = self.api.get_clock().timestamp.minute
+            if current_time % 15 == 0:
+                time.sleep(60)
+                print('Ready to trade')
+                break
+            else:
+                print('Not ready to trade yet')
+                time.sleep(60)
+
     #calculate the 5ema of a stock
     def calculate(self):
         for crypto in self.cryptos:
-            data = self.api.get_crypto_bars(symbol=crypto, timeframe='15Min').df
-            #set correct timezone
+            data = self.api.get_crypto_bars(symbol=crypto,timeframe='15Min', exchanges='BNCU').df
+            #reset timestamp index
             data = data.reset_index()
-            data['timestamp'] = data['timestamp'].dt.tz_convert('America/New_York')
-            data = data.set_index('timestamp')
-            #latest 5 close prices
-            data = data.drop(data.index[-1]) #not a complete candle therefore invalid data
-            vals = data.tail().iloc[0:, 4:5]
-            #last close value
+            #latest 5
+            data = data.drop(data.index[-1])
+            vals = data.tail().iloc[0:, 5:6]
+            #last close
             last_price = vals.iloc[4, 0]
-            #previous 5 close prices 
-            calcs = data.iloc[-10:-5, 4:5]
+            #previous 5
+            calcs = data.iloc[-10:-5, 5:6]
+            #calculate the previous 5ema
             five_ema = calcs['close'].mean()
+            #add close to the map
             self.closes[crypto] = last_price
 
             #set the 5ema of each crypto
@@ -63,6 +75,7 @@ class fiveEMA:
             self.closes = {}
             self.positions = {}
 
+            self.wait()
             self.calculate()
             self.positioning()
 
@@ -89,10 +102,10 @@ class fiveEMA:
             #remaining balance on the account
             print('balance is', float(self.api.get_account().equity))
 
-            #run every 15 mins (15min trade strategy)
+            #run every 15 mins (15min 5ema trade strategy)
             time.sleep(900)
 
 #run the program
 if __name__ == '__main__':
     Crypto = fiveEMA()
-    Crypto.run()       
+    Crypto.run() 
