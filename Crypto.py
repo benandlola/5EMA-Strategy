@@ -1,5 +1,4 @@
 import alpaca_trade_api as tradeapi
-import pandas as pd
 import time
 from config import API_KEY, API_SECRET, API_URL
 
@@ -8,7 +7,7 @@ class fiveEMA:
         #api data   
         self.api = tradeapi.REST(API_KEY, API_SECRET, API_URL, 'v2') 
         #cryptos to be traded
-        self.cryptos = ['BTCUSD', 'ETHUSD', 'LTCUSD', 'DOGEUSD', 'AAVEUSD', 'ALGOUSD', 'SOLUSD']
+        self.cryptos = ['BTCUSD', 'ETHUSD', 'ATOMUSD', 'DOGEUSD', 'AAVEUSD', 'ALGOUSD', 'SOLUSD', 'DOTUSD', 'ADAUSD', 'MATICUSD']
 
         #maps to keep track of trades
         self.emas = {}
@@ -33,7 +32,7 @@ class fiveEMA:
                 print('Not ready to trade yet')
                 time.sleep(60)
 
-    #calculate the 5ema of a stock
+    #calculate the 5ema of a crypto
     def calculate(self):
         for crypto in self.cryptos:
             data = self.api.get_crypto_bars(symbol=crypto,timeframe='15Min', exchanges='BNCU').df
