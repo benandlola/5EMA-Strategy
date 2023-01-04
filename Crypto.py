@@ -2,6 +2,7 @@ import alpaca_trade_api as tradeapi
 import time
 from config import API_KEY, API_SECRET, API_URL
 
+#TODO fix data collection
 class fiveEMA:
     def __init__(self):
         #api data   
@@ -82,7 +83,7 @@ class fiveEMA:
             for crypto, ema in self.emas.items():
                 #calculate balance and how much to purchase
                 balance = float(self.api.get_account().equity)
-                power = balance/len(self.cryptos) - len(self.   api.list_positions())
+                power = balance/len(self.cryptos) - len(self.api.list_positions())
 
                 #if the candle closes about the 5ema
                 if self.closes[crypto] > ema:
