@@ -16,6 +16,7 @@ class fiveEMA:
         self.closes = {}
         self.positions = {}
         self.data = {} 
+        self.count = 0
 
     #what will be run in main
     def run(self):
@@ -47,7 +48,7 @@ class fiveEMA:
 
 
     #collect data organized in dataframe
-    def collectYesterday(self):
+    def collectData(self):
         for stock in self.stocks:
             #collect yesterday's data
             start = (self.api.get_clock().next_open - pd.tseries.offsets.BDay(2)).isoformat('T')
@@ -58,9 +59,6 @@ class fiveEMA:
             df = df.set_index('timestamp')
             df = df.between_time('13:30', '15:45')
             self.data[stock] = df
-
-    def collectToday(self):
-        for stock in self.stocks:
             #today's data
             start = (self.api.get_clock().next_open - pd.tseries.offsets.BDay(1)).isoformat('T')
             df = self.api.get_bars(symbol=stock, timeframe='15Min', start=start).df 
@@ -71,11 +69,23 @@ class fiveEMA:
             #update data
             self.data[stock] = self.data[stock].append(df.tail(len(df.index)))
             for i in range(len(df.index)):
-                self.data[stock] = self.data[stock].drop(index=self.data.index[0])
+                self.data[stock] = self.data[stock].drop(index=self.data[stock].index[0])
 
     #calculate the 5ema of a stock
     def calculate(self):
         for stock in self.stocks:
+            #once fully updated with the data - start replacing
+            if self.count > 0:
+                start = (self.api.get_clock().next_open - pd.tseries.offsets.BDay(1)).isoformat('T')
+                df = self.api.get_bars(symbol=stock,    timeframe='15Min', start=start).df 
+                df = df.reset_index()
+                df['timestamp'] = df['timestamp'].dt.tz_convert('America/New_York')
+                df = df.set_index('timestamp')
+                df = df.between_time('9:30', '15:45')
+                #update data
+                self.data[stock] = self.data[stock].append(df.tail(1))
+                self.data[stock] = self.data[stock].drop(index=self.data[stock].index[0])
+
             #calculate sma
             five_ema = self.data[stock].head()['close'].mean()
             vals = self.data[stock].tail()
@@ -87,59 +97,59 @@ class fiveEMA:
                 five_ema = (val*2)/6 + five_ema*(1-2/6)
             self.closes[stock] = five_ema
 
+            self.count += 1
 
     def algorithm(self):
+        self.collectData()
         while(self.api.get_clock().is_open == True):
             #clear out data
             self.emas = {}
             self.closes = {}
             self.positions = {}
-            self.data = {}
 
-            #TODO - collect All data before and then only append when calculating?
-            self.collectYesterday()
-            self.collectToday()
             self.calculate()
             
             print(self.data)
             print(self.emas)
-            print(self.closes)
+
             for stock in self.stocks:
                 #get positions of each stock
                 qty = float(self.api.get_position(stock).qty)
                 side = ''
+                amount = 0
                 if qty != 0:
                     side = self.api.get_position(stock).side
+                    amount = self.api.get_position(stock).market_value
                 self.positions[stock] = [qty, side]
 
-                #TODO purchasing power thing
+                balance = float(self.api.get_account().equity)/2
+                try:
+                    power = balance/(len(self.stocks) - len(self.api.list_positions))
+                except ZeroDivisionError:
+                    power = 0
 
-                #TODO purchased at Timestamp, QTY, Notional, How Candle closed above/below EMA
-
+                now = datetime.datetime.now()
+               
                 #buy/sell based on 5ema
                 if self.closes[stock] > self.emas[stock]:
                     #if short then cover
                     if self.positions[stock][1] == 'short':
-                        print('SELL SHORT')
-                        #self.api.submit_order(symbol=stock, qty=self.positions[stock][0], side='buy', type='market', time_in_force='gtc')
-                        #print("EXITED SHORT OF ", stock, "FOR ")
+                        self.api.submit_order(symbol=stock, qty=qty, side='buy', type='market', time_in_force='gtc')
+                        print('EXITED SHORT OF ', stock, 'FOR ', power, 'AT ', now, 'WITH ', qty, 'SHARES')
                         
                     #if no poistion then go long
                     if self.positions[stock][0] == 0:
-                        print('GO LONG')
-                        #self.api.submit_order(symbol=stock, qty=1, side='buy', type='market', time_in_force='gtc')
-                        #print("ENTERED LONG OF ", stock, "FOR ")
+                        self.api.submit_order(symbol=stock, notional=power, side='buy', type='market', time_in_force='gtc')
+                        print('ENTERED LONG OF ', stock, 'FOR ', power, 'AT ', now, 'WITH ', qty, 'SHARES')
                 else:
                     #if long then sell
                     if self.positions[stock][1] == 'long':
-                        print('SELL LONG')
-                        #self.api.submit_order(symbol=stock, qty=self.positions[stock][0], side='sell', type='market', time_in_force='gtc')
-                        #print("EXITED LONG OF ", stock, "FOR ")
+                        self.api.submit_order(symbol=stock, qty=qty, side='sell', type='market', time_in_force='gtc')
+                        print('EXITED LONG OF ', stock, 'FOR ', amount, 'AT ', now, 'WITH ', qty, 'SHARES')
                     #if nothing open go short
                     if self.positions[stock][0] == 0:
-                        print('GO SHORT')
-                        #self.api.submit_order(symbol=stock, qty=1, side='sell', type='market', time_in_force='gtc')
-                        #print("EXITED SHORT OF ", stock, "FOR ")
+                        self.api.submit_order(symbol=stock, notional=power, side='sell', type='market', time_in_force='gtc')
+                        print('EXITED SHORT OF ', stock, 'FOR ', amount, 'AT ', now, 'WITH ', qty, 'SHARES')
 
         print('balance is', float(self.api.get_account().equity))
         time.sleep(900)

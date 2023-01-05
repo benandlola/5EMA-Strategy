@@ -83,7 +83,10 @@ class fiveEMA:
             for crypto, ema in self.emas.items():
                 #calculate balance and how much to purchase
                 balance = float(self.api.get_account().equity)
-                power = balance/len(self.cryptos) - len(self.api.list_positions())
+                try:
+                    power = balance/(len(self.cryptos) - len(self.api.list_positions()))
+                except ZeroDivisionError:
+                    power = 0
 
                 #if the candle closes about the 5ema
                 if self.closes[crypto] > ema:
