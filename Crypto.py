@@ -41,19 +41,17 @@ class fiveEMA:
             data = data.reset_index()
             #latest 5
             data = data.drop(data.index[-1])
-            vals = data.tail().iloc[0:, 5:6]
+            vals = data.tail(10)['close']
             #last close
-            last_price = vals.iloc[4, 0]
-            #previous 5
-            calcs = data.iloc[-10:-5, 5:6]
+            last_price = vals.iloc[-1]
             #calculate the previous 5ema
-            five_ema = calcs['close'].mean()
+            five_ema = vals.iloc[0]
             #add close to the map
             self.closes[crypto] = last_price
 
             #set the 5ema of each crypto
             for val in vals['close']:
-                five_ema = (val*2)/6 + five_ema*(1-2/6)
+                five_ema = (val*2/6) + five_ema*(1-2/6)
             self.emas[crypto] = five_ema
 
     #get positions of each crypto

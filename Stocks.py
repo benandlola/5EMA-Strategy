@@ -4,6 +4,7 @@ from config import API_KEY, API_SECRET, API_URL
 import datetime
 import pandas as pd
 import threading
+import math
 
 class fiveEMA:
     def __init__(self):
@@ -68,7 +69,8 @@ class fiveEMA:
             df = df.between_time('9:30', '15:45')
             #update data
             self.data[stock] = self.data[stock].append(df.tail(len(df.index)))
-            for i in range(len(df.index)):
+            self.data[stock] = self.data[stock].drop(index=self.data[stock].index[-1])
+            for i in range(len(df.index)-1):
                 self.data[stock] = self.data[stock].drop(index=self.data[stock].index[0])
 
     #calculate the 5ema of a stock
@@ -86,16 +88,15 @@ class fiveEMA:
                 self.data[stock] = self.data[stock].append(df.tail(1))
                 self.data[stock] = self.data[stock].drop(index=self.data[stock].index[0])
 
-            #calculate sma
-            five_ema = self.data[stock].head()['close'].mean()
-            vals = self.data[stock].tail()
-            #closing price for trading strat
-            last_close = self.data[stock].tail(1)['close']
+            #calculate ema
+            vals = self.data[stock].tail(10)['close']
+            last_close = vals.iloc[-1]
+            five_ema = vals.iloc[0]
             self.closes[stock] = last_close
             #calculate ema
-            for val in vals['close']:
+            for val in vals:
                 five_ema = (val*2)/6 + five_ema*(1-2/6)
-            self.closes[stock] = five_ema
+            self.emas[stock] = five_ema
 
             self.count += 1
 
@@ -108,13 +109,14 @@ class fiveEMA:
             self.positions = {}
 
             self.calculate()
-            
-            print(self.data)
-            print(self.emas)
 
             for stock in self.stocks:
                 #get positions of each stock
-                qty = float(self.api.get_position(stock).qty)
+                try:
+                    qty = float(self.api.get_position(stock).qty)
+                except Exception as exception:
+                    if exception.__str__() == 'position does not exist':
+                        qty = 0
                 side = ''
                 amount = 0
                 if qty != 0:
@@ -124,33 +126,34 @@ class fiveEMA:
 
                 balance = float(self.api.get_account().equity)/2
                 try:
-                    power = balance/(len(self.stocks) - len(self.api.list_positions))
+                    power = balance/(len(self.stocks) - len(self.api.list_positions()))
                 except ZeroDivisionError:
                     power = 0
+                    qty = math.floor(power/self.closes.get(stock))
 
                 now = datetime.datetime.now()
-               
+                
                 #buy/sell based on 5ema
-                if self.closes[stock] > self.emas[stock]:
+                if self.closes.get(stock) > self.emas.get(stock):
                     #if short then cover
                     if self.positions[stock][1] == 'short':
-                        self.api.submit_order(symbol=stock, qty=qty, side='buy', type='market', time_in_force='gtc')
-                        print('EXITED SHORT OF ', stock, 'FOR ', power, 'AT ', now, 'WITH ', qty, 'SHARES')
+                        self.api.submit_order(symbol=stock, qty=qty, side='buy', type='market', time_in_force='day')
+                        print('EXITED SHORT OF ', stock, 'FOR ', power, 'AT ', now)
                         
                     #if no poistion then go long
                     if self.positions[stock][0] == 0:
-                        self.api.submit_order(symbol=stock, notional=power, side='buy', type='market', time_in_force='gtc')
-                        print('ENTERED LONG OF ', stock, 'FOR ', power, 'AT ', now, 'WITH ', qty, 'SHARES')
+                        self.api.submit_order(symbol=stock, qty=qty, side='buy', type='market', time_in_force='day')
+                        print('ENTERED LONG OF ', stock, 'FOR ', power, 'AT ', now)
                 else:
                     #if long then sell
                     if self.positions[stock][1] == 'long':
-                        self.api.submit_order(symbol=stock, qty=qty, side='sell', type='market', time_in_force='gtc')
-                        print('EXITED LONG OF ', stock, 'FOR ', amount, 'AT ', now, 'WITH ', qty, 'SHARES')
+                        self.api.submit_order(symbol=stock, qty=qty, side='sell', type='market', time_in_force='day')
+                        print('EXITED LONG OF ', stock, 'FOR ', amount, 'AT ', now)
                     #if nothing open go short
                     if self.positions[stock][0] == 0:
-                        self.api.submit_order(symbol=stock, notional=power, side='sell', type='market', time_in_force='gtc')
-                        print('EXITED SHORT OF ', stock, 'FOR ', amount, 'AT ', now, 'WITH ', qty, 'SHARES')
-
+                        self.api.submit_order(symbol=stock, qty=qty, side='sell', type='market', time_in_force='day')
+                        print('ENTERED SHORT OF ', stock, 'FOR ', amount, 'AT ', now)
+                
         print('balance is', float(self.api.get_account().equity))
         time.sleep(900)
 
